@@ -24,6 +24,40 @@ Flashing over SSH is running
 mix upload <IP>
 ```
 
+## Connecting to the Device
+
+The Nerves device advertises itself via mDNS as `nerves.local` and `nerves-<serial>.local`.
+
+### SSH Access
+
+``` bash
+ssh nerves.local
+```
+
+### mDNS Setup Requirements
+
+#### macOS
+
+mDNS (Bonjour) works out of the box. No configuration needed.
+
+#### NixOS
+
+Add to your `/etc/nixos/configuration.nix`:
+
+```nix
+{
+  services.avahi = {
+    enable = true;
+    nssmdns4 = true;  # Enable mDNS resolution in NSS
+  };
+}
+```
+
+Then rebuild:
+```bash
+sudo nixos-rebuild switch
+```
+
 ## Learn more
 
 - Official docs: <https://hexdocs.pm/nerves/getting-started.html>

@@ -6,13 +6,21 @@ defmodule MountainNerves.Bot do
 
   require Logger
 
+  alias MountainNerves.Trails
+  alias MountainNerves.Middleware.ConversationState
+
   command("start")
   command("help", description: "Print the bot's help")
   command("admin", description: "Admin commands (owner only)")
   command("status", description: "Show system status (admin only)")
   command("reboot", description: "Reboot the device (admin only)")
+  command("estimate_trail", description: "Estimate the difficulty of a trail")
+  command("annual_summary", description: "Get the annual summary stats")
+  command("interannual_summary", description: "Get stats from the beginning of the current year")
+  command("monthly_summary", description: "Get the monthly summary stats")
 
   middleware(ExGram.Middleware.IgnoreUsername)
+  middleware(MountainNerves.Middleware.ConversationState)
 
   def bot(), do: @bot
 
@@ -23,12 +31,38 @@ defmodule MountainNerves.Bot do
 
   def handle({:command, :start, msg}, context) do
     log_command("start", msg)
-    answer(context, "Hi!")
+    result = answer(context, "Hi!")
+    Logger.info("Bot: Start response result: #{inspect(result)}")
+    result
   end
 
   def handle({:command, :help, msg}, context) do
     log_command("help", msg)
-    answer(context, "Here is your help:")
+
+    result =
+      answer(
+        context,
+        """
+        <b>Trail Evaluator Bot</b>
+
+        📊 <b>Trail Commands</b>
+        /estimate_trail - Estimate the difficulty of a trail
+        /annual_summary - Get annual summary stats (last 365 days)
+        /interannual_summary - Get year-to-date stats
+        /monthly_summary - Get monthly summary stats
+
+        ⚙️ <b>Admin Commands</b>
+        /admin - View admin commands
+        /status - Show system status (admin only)
+        /reboot - Reboot the device (admin only)
+
+        /help - Show this message
+        """,
+        parse_mode: "HTML"
+      )
+
+    Logger.info("Bot: Help response result: #{inspect(result)}")
+    result
   end
 
   def handle({:command, :admin, msg}, context) do
@@ -38,14 +72,14 @@ defmodule MountainNerves.Bot do
       answer(
         context,
         """
-        *Admin Commands*
+        <b>Admin Commands</b>
 
         /status - Show system status
         /reboot - Reboot the device
 
         You are authorized as the bot owner.
         """,
-        parse_mode: "Markdown"
+        parse_mode: "HTML"
       )
     else
       answer(context, "⛔ Access denied. This command is for the bot owner only.")
@@ -57,7 +91,7 @@ defmodule MountainNerves.Bot do
 
     if is_admin?(msg) do
       status_info = get_system_status()
-      answer(context, status_info, parse_mode: "Markdown")
+      answer(context, status_info, parse_mode: "HTML")
     else
       answer(context, "⛔ Access denied. This command is for the bot owner only.")
     end
@@ -83,6 +117,54 @@ defmodule MountainNerves.Bot do
     end
   end
 
+  # Trail estimation conversation flow
+  def handle({:command, :estimate_trail, msg}, context) do
+    log_command("estimate_trail", msg)
+
+    new_context = %{context | extra: %{step: :input_name, trail: %{}}}
+    save_state(msg, new_context.extra)
+    answer(new_context, "🏔️ Introduce el nombre de la ruta")
+  end
+
+  def handle({:command, :annual_summary, msg}, context) do
+    log_command("annual_summary", msg)
+
+    case Trails.annual_summary() do
+      {overall_stats, summary} ->
+        message = format_summary_message("Annual", overall_stats, summary)
+        answer(context, message, parse_mode: "HTML")
+
+      _error ->
+        answer(context, "Error retrieving annual summary")
+    end
+  end
+
+  def handle({:command, :interannual_summary, msg}, context) do
+    log_command("interannual_summary", msg)
+
+    case Trails.interannual_summary() do
+      {overall_stats, summary} ->
+        message = format_summary_message("Year-to-Date", overall_stats, summary)
+        answer(context, message, parse_mode: "HTML")
+
+      _error ->
+        answer(context, "Error retrieving interannual summary")
+    end
+  end
+
+  def handle({:command, :monthly_summary, msg}, context) do
+    log_command("monthly_summary", msg)
+
+    case Trails.monthly_summary() do
+      {overall_stats, summary} ->
+        message = format_summary_message("Monthly", overall_stats, summary)
+        answer(context, message, parse_mode: "HTML")
+
+      _error ->
+        answer(context, "Error retrieving monthly summary")
+    end
+  end
+
   def handle({:info, :init}, _cnt) do
     Logger.info("Init with Internet")
 
@@ -95,6 +177,109 @@ defmodule MountainNerves.Bot do
     :ok
   end
 
+  # Trail conversation flow - input name
+  def handle({:text, text, tg_model}, %{extra: %{step: :input_name, trail: trail}} = context) do
+    trail = Map.put(trail, :name, text)
+    new_context = %{context | extra: %{step: :input_height, trail: trail}}
+    save_state(tg_model, new_context.extra)
+    answer(new_context, "📏 Introduce el desnivel de la ruta en metros")
+  end
+
+  # Trail conversation flow - input height
+  def handle({:text, text, tg_model}, %{extra: %{step: :input_height, trail: trail}} = context) do
+    case parse_float(text) do
+      {:ok, height} ->
+        trail = Map.put(trail, :height, height)
+        new_context = %{context | extra: %{step: :input_distance, trail: trail}}
+        save_state(tg_model, new_context.extra)
+        answer(new_context, "📍 Introduce la distancia de la ruta en kilómetros")
+
+      :error ->
+        answer(context, "❌ No me has dado un número válido. Introduce el desnivel en metros:")
+    end
+  end
+
+  # Trail conversation flow - input distance
+  def handle({:text, text, tg_model}, %{extra: %{step: :input_distance, trail: trail}} = context) do
+    case parse_float(text) do
+      {:ok, distance} ->
+        trail = Map.put(trail, :distance, distance)
+        new_context = %{context | extra: %{step: :input_velocity, trail: trail}}
+        save_state(tg_model, new_context.extra)
+        answer(new_context, "🚀 Introduce la velocidad de la ruta en km/h")
+
+      :error ->
+        answer(
+          context,
+          "❌ No me has dado un número válido. Introduce la distancia en kilómetros:"
+        )
+    end
+  end
+
+  # Trail conversation flow - input velocity
+  def handle({:text, text, tg_model}, %{extra: %{step: :input_velocity, trail: trail}} = context) do
+    case parse_float(text) do
+      {:ok, velocity} ->
+        trail = Map.put(trail, :velocity, velocity)
+        new_context = %{context | extra: %{step: :input_weather, trail: trail}}
+        save_state(tg_model, new_context.extra)
+        answer(new_context, "🌦️ ¿Ha habido meteorología extrema? S/N")
+
+      :error ->
+        answer(context, "❌ No me has dado un número válido. Introduce la velocidad en km/h:")
+    end
+  end
+
+  # Trail conversation flow - input weather (final step)
+  def handle({:text, text, tg_model}, %{extra: %{step: :input_weather, trail: trail}} = context) do
+    extreme_temp = String.upcase(text) in ["S", "SI", "Y", "YES"]
+
+    score =
+      Trails.compute_score(
+        trail.height,
+        trail.distance,
+        trail.velocity,
+        extreme_temp
+      )
+
+    # Save to database
+    trail_attrs = %{
+      name: trail.name,
+      height: trail.height,
+      distance: trail.distance,
+      velocity: trail.velocity,
+      extreme_temp: extreme_temp,
+      score: score
+    }
+
+    case Trails.create_trail(trail_attrs) do
+      {:ok, _saved_trail} ->
+        classification = Trails.score_classification(score)
+
+        # Clear conversation state - conversation is complete
+        clear_state(tg_model)
+
+        answer(
+          context,
+          """
+          ✅ Ruta guardada!
+
+          🎯 La puntuación de la ruta es de #{Float.round(score, 2)} sobre 100
+
+          🏆 La ruta se clasifica como: <b>#{classification}</b>
+          """,
+          parse_mode: "HTML"
+        )
+
+      {:error, _changeset} ->
+        # Clear conversation state
+        clear_state(tg_model)
+
+        answer(context, "❌ Error al guardar la ruta. Por favor, inténtalo de nuevo.")
+    end
+  end
+
+  # Default text handler - no active conversation
   def handle({:text, text, tg_model}, context) do
     log_command("echo", tg_model)
     answer(context, text)
@@ -138,15 +323,15 @@ defmodule MountainNerves.Bot do
     memory = get_memory_info()
 
     status = """
-    *System Status*
+    <b>System Status</b>
 
-    *Target*: #{target}
-    *Uptime*: #{uptime}
-    *Memory*: #{memory}
+    <b>Target</b>: #{target}
+    <b>Uptime</b>: #{uptime}
+    <b>Memory</b>: #{memory}
     """
 
     if target == :host do
-      status <> "\n_Running on host (development mode)_"
+      status <> "\n<i>Running on host (development mode)</i>"
     else
       status
     end
@@ -212,6 +397,69 @@ defmodule MountainNerves.Bot do
 
   defp get_user_info(_msg) do
     "Unknown user"
+  end
+
+  # Parse float from string, handling both comma and dot as decimal separator
+  defp parse_float(text) do
+    cleaned = String.replace(text, ",", ".")
+
+    case Float.parse(cleaned) do
+      {number, ""} -> {:ok, number}
+      {number, _rest} -> {:ok, number}
+      :error -> :error
+    end
+  end
+
+  # Format summary message for annual/monthly stats
+  defp format_summary_message(
+         period,
+         {cum_distance, cum_height, cum_score, avg_distance, avg_velocity, avg_score, total_count},
+         summary
+       ) do
+    avg_classification = Trails.score_classification(avg_score)
+
+    overall_text = """
+    <b>#{period} Summary</b>
+
+    📊 <b>Overall Statistics (#{total_count} trails):</b>
+    📍 Average distance: #{format_number(avg_distance)} km
+    🚀 Average velocity: #{format_number(avg_velocity)} km/h
+    🎯 Average score: #{format_number(avg_score)} - #{avg_classification} 🏆
+
+    📦 <b>Cumulative Totals:</b>
+    📍 Total distance: #{format_number(cum_distance)} km
+    🪜 Total height: #{format_height(cum_height)} m
+    🎯 Total score: #{format_number(cum_score)}
+
+    🗺️ <b>Route Frequencies:</b>
+    """
+
+    frequencies_text =
+      summary
+      |> Enum.map(fn {name, freq, _velocity, _distance, _height, _score} ->
+        "  • #{name}: #{freq} times"
+      end)
+      |> Enum.join("\n")
+
+    overall_text <> frequencies_text
+  end
+
+  defp format_number(nil), do: "0.00"
+  defp format_number(num) when is_float(num), do: Float.round(num, 2) |> Float.to_string()
+  defp format_number(num) when is_integer(num), do: format_integer_with_separators(num)
+
+  defp format_height(nil), do: "0"
+  defp format_height(num) when is_float(num), do: format_integer_with_separators(round(num))
+  defp format_height(num) when is_integer(num), do: format_integer_with_separators(num)
+
+  defp format_integer_with_separators(num) when is_integer(num) do
+    num
+    |> Integer.to_string()
+    |> String.graphemes()
+    |> Enum.reverse()
+    |> Enum.chunk_every(3)
+    |> Enum.join(".")
+    |> String.reverse()
   end
 
   # Send IP address with retry logic (spawns async task)
@@ -358,4 +606,22 @@ defmodule MountainNerves.Bot do
     |> String.replace(".", "\\.")
     |> String.replace("!", "\\!")
   end
+
+  # Helper functions for conversation state management
+  defp save_state(msg, extra) do
+    case extract_chat_id(msg) do
+      nil -> :ok
+      chat_id -> ConversationState.save_state(chat_id, extra)
+    end
+  end
+
+  defp clear_state(msg) do
+    case extract_chat_id(msg) do
+      nil -> :ok
+      chat_id -> ConversationState.clear_state(chat_id)
+    end
+  end
+
+  defp extract_chat_id(%{chat: %{id: id}}), do: id
+  defp extract_chat_id(_), do: nil
 end

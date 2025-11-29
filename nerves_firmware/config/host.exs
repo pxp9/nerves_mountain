@@ -20,12 +20,25 @@ config :nerves_runtime,
        "a.nerves_fw_version" => "0.0.0"
      }}
 
-# Configure Ecto for host (development) environment
-config :mountain_nerves, MountainNerves.Repo,
-  database: Path.expand("../mountain_nerves_dev.db", Path.dirname(__ENV__.file)),
-  pool_size: 5,
-  stacktrace: true,
-  show_sensitive_data_on_connection_error: true
+# Configure Ecto for host environment
+if Mix.env() == :test do
+  config :mountain_nerves, MountainNerves.Repo,
+    database: Path.expand("../mountain_nerves_test.db", Path.dirname(__ENV__.file)),
+    pool: Ecto.Adapters.SQL.Sandbox,
+    pool_size: 10
+
+  # Disable the endpoint server in tests
+  config :mountain_nerves, InterfaceWeb.Endpoint, server: false
+
+  # Print only warnings and errors during test
+  config :logger, level: :warning
+else
+  config :mountain_nerves, MountainNerves.Repo,
+    database: Path.expand("../mountain_nerves_dev.db", Path.dirname(__ENV__.file)),
+    pool_size: 5,
+    stacktrace: true,
+    show_sensitive_data_on_connection_error: true
+end
 
 # Configure Tesla adapter (same as target)
 config :tesla, :adapter, {Tesla.Adapter.Finch, name: Req.Finch}

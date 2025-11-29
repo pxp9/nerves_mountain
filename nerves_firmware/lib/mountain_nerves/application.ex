@@ -8,6 +8,7 @@ defmodule MountainNerves.Application do
   @impl true
   def start(_type, _args) do
     setup_bot()
+    setup_database()
 
     children =
       [
@@ -51,6 +52,7 @@ defmodule MountainNerves.Application do
 
   if Mix.target() == :host do
     defp setup_bot(), do: :ok
+    defp setup_database(), do: :ok
   else
     defp setup_bot() do
       kv = Nerves.Runtime.KV.get_all()
@@ -64,6 +66,10 @@ defmodule MountainNerves.Application do
       if tg_owner_user && tg_owner_user != "" do
         Application.put_env(:mountain_nerves, :tg_owner_user, tg_owner_user)
       end
+    end
+
+    defp setup_database() do
+      MountainNerves.Release.migrate()
     end
   end
 
