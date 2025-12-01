@@ -133,10 +133,10 @@ defmodule MountainNerves.Trails do
   Returns {overall_stats, summary_by_name}
 
   overall_stats is a tuple:
-  {total_distance, total_height, total_score, avg_distance, avg_velocity, avg_score, total_count}
+  {total_distance, total_height, avg_distance, avg_velocity, avg_score, total_count}
 
   summary_by_name is a list of tuples:
-  [{name, count, avg_velocity, avg_distance, avg_height, avg_score}, ...]
+  [{name, count, avg_velocity, avg_distance, avg_height, avg_score, last_datetime}, ...]
   """
   def n_time_summary(from_datetime) do
     summary_by_name = summary_by_name_query(from_datetime)
@@ -155,8 +155,10 @@ defmodule MountainNerves.Trails do
       avg(t.velocity),
       avg(t.distance),
       avg(t.height),
-      avg(t.score)
+      avg(t.score),
+      max(t.inserted_at)
     })
+    |> order_by([t], desc: max(t.inserted_at))
     |> Repo.all()
   end
 
@@ -167,7 +169,6 @@ defmodule MountainNerves.Trails do
       |> select([t], {
         sum(t.distance),
         sum(t.height),
-        sum(t.score),
         avg(t.distance),
         avg(t.velocity),
         avg(t.score),
@@ -176,7 +177,7 @@ defmodule MountainNerves.Trails do
       |> Repo.one()
 
     case result do
-      {nil, nil, nil, nil, nil, nil, nil} -> {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0}
+      {nil, nil, nil, nil, nil, nil} -> {0.0, 0.0, 0.0, 0.0, 0.0, 0}
       result -> result
     end
   end

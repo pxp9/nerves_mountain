@@ -413,7 +413,7 @@ defmodule MountainNerves.Bot do
   # Format summary message for annual/monthly stats
   defp format_summary_message(
          period,
-         {cum_distance, cum_height, cum_score, avg_distance, avg_velocity, avg_score, total_count},
+         {cum_distance, cum_height, avg_distance, avg_velocity, avg_score, total_count},
          summary
        ) do
     avg_classification = Trails.score_classification(avg_score)
@@ -429,15 +429,15 @@ defmodule MountainNerves.Bot do
     📦 <b>Cumulative Totals:</b>
     📍 Total distance: #{format_number(cum_distance)} km
     🪜 Total height: #{format_height(cum_height)} m
-    🎯 Total score: #{format_number(cum_score)}
 
-    🗺️ <b>Route Frequencies:</b>
+    🗺️ <b>Route Frequencies (sorted by last done):</b>
     """
 
     frequencies_text =
       summary
-      |> Enum.map(fn {name, freq, _velocity, _distance, _height, _score} ->
-        "  • #{name}: #{freq} times"
+      |> Enum.map(fn {name, freq, _velocity, _distance, _height, _score, last_datetime} ->
+        last_date = format_datetime(last_datetime)
+        "  • #{name}: #{freq} times (last: #{last_date})"
       end)
       |> Enum.join("\n")
 
@@ -447,6 +447,15 @@ defmodule MountainNerves.Bot do
   defp format_number(nil), do: "0.00"
   defp format_number(num) when is_float(num), do: Float.round(num, 2) |> Float.to_string()
   defp format_number(num) when is_integer(num), do: format_integer_with_separators(num)
+
+  defp format_datetime(nil), do: "N/A"
+
+  defp format_datetime(%DateTime{} = dt) do
+    "#{dt.year}-#{pad(dt.month)}-#{pad(dt.day)} #{pad(dt.hour)}:#{pad(dt.minute)}"
+  end
+
+  defp pad(num) when num < 10, do: "0#{num}"
+  defp pad(num), do: "#{num}"
 
   defp format_height(nil), do: "0"
   defp format_height(num) when is_float(num), do: format_integer_with_separators(round(num))
