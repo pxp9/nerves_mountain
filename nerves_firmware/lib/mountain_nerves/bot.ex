@@ -39,30 +39,26 @@ defmodule MountainNerves.Bot do
   def handle({:command, :help, msg}, context) do
     log_command("help", msg)
 
-    result =
-      answer(
-        context,
-        """
-        <b>Trail Evaluator Bot</b>
+    answer(
+      context,
+      """
+      <b>Trail Evaluator Bot</b>
 
-        📊 <b>Trail Commands</b>
-        /estimate_trail - Estimate the difficulty of a trail
-        /annual_summary - Get annual summary stats (last 365 days)
-        /interannual_summary - Get year-to-date stats
-        /monthly_summary - Get monthly summary stats
+      📊 <b>Trail Commands</b>
+      /estimate_trail - Estimate the difficulty of a trail
+      /annual_summary - Get annual summary stats (last 365 days)
+      /interannual_summary - Get year-to-date stats
+      /monthly_summary - Get monthly summary stats
 
-        ⚙️ <b>Admin Commands</b>
-        /admin - View admin commands
-        /status - Show system status (admin only)
-        /reboot - Reboot the device (admin only)
+      ⚙️ <b>Admin Commands</b>
+      /admin - View admin commands
+      /status - Show system status (admin only)
+      /reboot - Reboot the device (admin only)
 
-        /help - Show this message
-        """,
-        parse_mode: "HTML"
-      )
-
-    Logger.info("Bot: Help response result: #{inspect(result)}")
-    result
+      /help - Show this message
+      """,
+      parse_mode: "HTML"
+    )
   end
 
   def handle({:command, :admin, msg}, context) do
