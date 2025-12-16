@@ -127,8 +127,7 @@ defmodule MountainNerves.Bot do
 
     case Trails.annual_summary() do
       {overall_stats, summary} ->
-        message = format_summary_message("Annual", overall_stats, summary)
-        answer(context, message, parse_mode: "HTML")
+        send_paginated_summary(context, "annual", "Annual", overall_stats, summary, 0)
 
       _error ->
         answer(context, "Error retrieving annual summary")
@@ -140,8 +139,7 @@ defmodule MountainNerves.Bot do
 
     case Trails.interannual_summary() do
       {overall_stats, summary} ->
-        message = format_summary_message("Year-to-Date", overall_stats, summary)
-        answer(context, message, parse_mode: "HTML")
+        send_paginated_summary(context, "interannual", "Year-to-Date", overall_stats, summary, 0)
 
       _error ->
         answer(context, "Error retrieving interannual summary")
@@ -153,12 +151,32 @@ defmodule MountainNerves.Bot do
 
     case Trails.monthly_summary() do
       {overall_stats, summary} ->
-        message = format_summary_message("Monthly", overall_stats, summary)
-        answer(context, message, parse_mode: "HTML")
+        send_paginated_summary(context, "monthly", "Monthly", overall_stats, summary, 0)
 
       _error ->
         answer(context, "Error retrieving monthly summary")
     end
+  end
+
+  # Handle pagination callbacks
+  def handle({:callback_query, %{data: "summary:" <> data} = query}, context) do
+    [summary_type, page_str] = String.split(data, ":")
+    page = String.to_integer(page_str)
+
+    {overall_stats, summary} = case summary_type do
+      "annual" -> Trails.annual_summary()
+      "interannual" -> Trails.interannual_summary()
+      "monthly" -> Trails.monthly_summary()
+    end
+
+    period_name = case summary_type do
+      "annual" -> "Annual"
+      "interannual" -> "Year-to-Date"
+      "monthly" -> "Monthly"
+    end
+
+    # Edit the message with new page
+    edit_paginated_summary(context, query, summary_type, period_name, overall_stats, summary, page)
   end
 
   def handle({:info, :init}, _cnt) do
@@ -288,6 +306,108 @@ defmodule MountainNerves.Bot do
   def handle({message_type, _parsed, _tg_model} = _msg, _cnt) do
     Logger.warning("Unhandled update parsed: #{message_type}")
   end
+
+  # Send paginated summary with navigation buttons
+  defp send_paginated_summary(context, summary_type, period_name, overall_stats, summary, page) do
+    message = format_summary_page(period_name, overall_stats, summary, page)
+    keyboard = build_pagination_keyboard(summary_type, summary, page)
+
+    opts = [parse_mode: "HTML"]
+    opts = if keyboard, do: opts ++ [reply_markup: keyboard], else: opts
+
+    answer(context, message, opts)
+  end
+
+  # Edit message with new page
+  defp edit_paginated_summary(context, query, summary_type, period_name, overall_stats, summary, page) do
+    message = format_summary_page(period_name, overall_stats, summary, page)
+    keyboard = build_pagination_keyboard(summary_type, summary, page)
+
+    chat_id = query.message.chat.id
+    message_id = query.message.message_id
+
+    opts = [chat_id: chat_id, message_id: message_id, parse_mode: "HTML"]
+    opts = if keyboard, do: opts ++ [reply_markup: keyboard], else: opts
+
+    ExGram.edit_message_text(message, opts)
+    ExGram.answer_callback_query(query.id)
+  end
+
+  # Format a single page of the summary
+  defp format_summary_page(period, overall_stats, summary, page) do
+    {cum_distance, cum_height, avg_distance, avg_velocity, avg_score, total_count} = overall_stats
+    avg_classification = Trails.score_classification(avg_score)
+
+    items_per_page = 8
+    total_pages = ceil(length(summary) / items_per_page)
+    start_idx = page * items_per_page
+    page_items = Enum.slice(summary, start_idx, items_per_page)
+
+    overall_text = """
+    <b>#{period} Summary (Page #{page + 1}/#{total_pages})</b>
+
+    📊 <b>Overall Statistics (#{total_count} trails):</b>
+    📍 Average distance: #{format_number(avg_distance)} km
+    🚀 Average velocity: #{format_number(avg_velocity)} km/h
+    🎯 Average score: #{format_number(avg_score)} - #{avg_classification} 🏆
+
+    📦 <b>Cumulative Totals:</b>
+    📍 Total distance: #{format_number(cum_distance)} km
+    🪜 Total height: #{format_height(cum_height)} m
+
+    🗺️ <b>Route Frequencies (sorted by last done):</b>
+    """
+
+    frequencies_text =
+      page_items
+      |> Enum.map(fn {name, freq, _velocity, _distance, _height, score, last_datetime} ->
+        last_date = format_datetime(last_datetime)
+        score_class = Trails.score_classification(score)
+        """
+          • <b>#{name}</b>
+            Times: #{freq}
+            Score: #{format_number(score)} - #{score_class}
+            Last done: #{last_date}
+        """
+      end)
+      |> Enum.join("\n")
+
+    overall_text <> frequencies_text
+  end
+
+  # Build pagination keyboard with Previous/Next buttons
+  defp build_pagination_keyboard(summary_type, summary, page) do
+    items_per_page = 5
+    total_pages = ceil(length(summary) / items_per_page)
+
+    buttons = []
+
+    # Add Previous button if not on first page
+    buttons = if page > 0 do
+      [%{text: "⬅️ Previous", callback_data: "summary:#{summary_type}:#{page - 1}"} | buttons]
+    else
+      buttons
+    end
+
+    # Add Next button if not on last page
+    buttons = if page < total_pages - 1 do
+      buttons ++ [%{text: "Next ➡️", callback_data: "summary:#{summary_type}:#{page + 1}"}]
+    else
+      buttons
+    end
+
+    # Return keyboard markup
+    if length(buttons) > 0 do
+      %ExGram.Model.InlineKeyboardMarkup{inline_keyboard: [buttons]}
+    else
+      nil
+    end
+  end
+
+  # Extract chat_id from context
+  defp get_chat_id_from_context(%{update: %{message: %{chat: %{id: chat_id}}}}), do: chat_id
+  defp get_chat_id_from_context(%{update: %{callback_query: %{message: %{chat: %{id: chat_id}}}}}), do: chat_id
+  defp get_chat_id_from_context(_), do: nil
 
   # Helper function to check if user is admin
   defp is_admin?(%{from: %{id: user_id}}) do
@@ -463,7 +583,7 @@ defmodule MountainNerves.Bot do
     |> String.graphemes()
     |> Enum.reverse()
     |> Enum.chunk_every(3)
-    |> Enum.join(".")
+    |> Enum.join(" ")
     |> String.reverse()
   end
 

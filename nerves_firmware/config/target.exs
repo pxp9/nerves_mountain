@@ -26,7 +26,7 @@ config :nerves, :erlinit, update_clock: true
 
 keys =
   System.user_home!()
-  |> Path.join(".ssh/id_{rsa,ecdsa,ed25519}.pub")
+  |> Path.join(".ssh/mountain_nerves.pub")
   |> Path.wildcard()
 
 if keys == [],

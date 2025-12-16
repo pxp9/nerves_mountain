@@ -16,7 +16,7 @@ defmodule MountainNerves.Trails.Trail do
   @doc false
   def changeset(trail, attrs) do
     trail
-    |> cast(attrs, [:name, :height, :distance, :velocity, :extreme_temp, :score])
+    |> cast(attrs, [:name, :height, :distance, :velocity, :extreme_temp, :score, :inserted_at, :updated_at])
     |> validate_required([:name, :height, :distance, :velocity, :score])
     |> validate_number(:height, greater_than_or_equal_to: 0)
     |> validate_number(:distance, greater_than_or_equal_to: 0)

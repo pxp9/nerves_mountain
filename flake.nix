@@ -67,6 +67,7 @@
                 espeak-ng
                 mbrola
                 mbrola-voices
+                sqlite
 
                 ## AtomVM / Pico
                 # gcc-arm-embedded
