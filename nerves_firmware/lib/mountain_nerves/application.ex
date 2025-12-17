@@ -39,7 +39,7 @@ defmodule MountainNerves.Application do
   defp target_children(_target) do
     [
       MountainNerves.Repo,
-      {MountainNerves.WiFi, []},
+      # {MountainNerves.WiFi, []},
       InterfaceWeb.Telemetry,
       {DNSCluster, query: Application.get_env(:mountain_nerves, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: Interface.PubSub},

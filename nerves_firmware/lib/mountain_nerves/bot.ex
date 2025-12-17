@@ -9,6 +9,9 @@ defmodule MountainNerves.Bot do
   alias MountainNerves.Trails
   alias MountainNerves.Middleware.ConversationState
 
+  # Pagination configuration
+  @items_per_page 8
+
   command("start")
   command("help", description: "Print the bot's help")
   command("admin", description: "Admin commands (owner only)")
@@ -159,7 +162,7 @@ defmodule MountainNerves.Bot do
   end
 
   # Handle pagination callbacks
-  def handle({:callback_query, %{data: "summary:" <> data} = query}, context) do
+  def handle({:callback_query, %{data: "summary:" <> data} = query}, _context) do
     [summary_type, page_str] = String.split(data, ":")
     page = String.to_integer(page_str)
 
@@ -176,7 +179,7 @@ defmodule MountainNerves.Bot do
     end
 
     # Edit the message with new page
-    edit_paginated_summary(context, query, summary_type, period_name, overall_stats, summary, page)
+    edit_paginated_summary(query, summary_type, period_name, overall_stats, summary, page)
   end
 
   def handle({:info, :init}, _cnt) do
@@ -319,7 +322,7 @@ defmodule MountainNerves.Bot do
   end
 
   # Edit message with new page
-  defp edit_paginated_summary(context, query, summary_type, period_name, overall_stats, summary, page) do
+  defp edit_paginated_summary(query, summary_type, period_name, overall_stats, summary, page) do
     message = format_summary_page(period_name, overall_stats, summary, page)
     keyboard = build_pagination_keyboard(summary_type, summary, page)
 
@@ -338,10 +341,9 @@ defmodule MountainNerves.Bot do
     {cum_distance, cum_height, avg_distance, avg_velocity, avg_score, total_count} = overall_stats
     avg_classification = Trails.score_classification(avg_score)
 
-    items_per_page = 8
-    total_pages = ceil(length(summary) / items_per_page)
-    start_idx = page * items_per_page
-    page_items = Enum.slice(summary, start_idx, items_per_page)
+    total_pages = ceil(length(summary) / @items_per_page)
+    start_idx = page * @items_per_page
+    page_items = Enum.slice(summary, start_idx, @items_per_page)
 
     overall_text = """
     <b>#{period} Summary (Page #{page + 1}/#{total_pages})</b>
@@ -377,8 +379,7 @@ defmodule MountainNerves.Bot do
 
   # Build pagination keyboard with Previous/Next buttons
   defp build_pagination_keyboard(summary_type, summary, page) do
-    items_per_page = 5
-    total_pages = ceil(length(summary) / items_per_page)
+    total_pages = ceil(length(summary) / @items_per_page)
 
     buttons = []
 
@@ -403,11 +404,6 @@ defmodule MountainNerves.Bot do
       nil
     end
   end
-
-  # Extract chat_id from context
-  defp get_chat_id_from_context(%{update: %{message: %{chat: %{id: chat_id}}}}), do: chat_id
-  defp get_chat_id_from_context(%{update: %{callback_query: %{message: %{chat: %{id: chat_id}}}}}), do: chat_id
-  defp get_chat_id_from_context(_), do: nil
 
   # Helper function to check if user is admin
   defp is_admin?(%{from: %{id: user_id}}) do
@@ -524,40 +520,6 @@ defmodule MountainNerves.Bot do
       {number, _rest} -> {:ok, number}
       :error -> :error
     end
-  end
-
-  # Format summary message for annual/monthly stats
-  defp format_summary_message(
-         period,
-         {cum_distance, cum_height, avg_distance, avg_velocity, avg_score, total_count},
-         summary
-       ) do
-    avg_classification = Trails.score_classification(avg_score)
-
-    overall_text = """
-    <b>#{period} Summary</b>
-
-    📊 <b>Overall Statistics (#{total_count} trails):</b>
-    📍 Average distance: #{format_number(avg_distance)} km
-    🚀 Average velocity: #{format_number(avg_velocity)} km/h
-    🎯 Average score: #{format_number(avg_score)} - #{avg_classification} 🏆
-
-    📦 <b>Cumulative Totals:</b>
-    📍 Total distance: #{format_number(cum_distance)} km
-    🪜 Total height: #{format_height(cum_height)} m
-
-    🗺️ <b>Route Frequencies (sorted by last done):</b>
-    """
-
-    frequencies_text =
-      summary
-      |> Enum.map(fn {name, freq, _velocity, _distance, _height, _score, last_datetime} ->
-        last_date = format_datetime(last_datetime)
-        "  • #{name}: #{freq} times (last: #{last_date})"
-      end)
-      |> Enum.join("\n")
-
-    overall_text <> frequencies_text
   end
 
   defp format_number(nil), do: "0.00"

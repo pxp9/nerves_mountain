@@ -13,7 +13,7 @@ defmodule MountainNerves.Trails do
   @chichinabo_superior 50
   @overchichi 60
   @ruton 80
-  @_puto_infierno 100
+  # @puto_infierno 100
 
   # Calculation constants
   @max_height 1500
