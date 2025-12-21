@@ -7,7 +7,8 @@ defmodule MountainNerves.Application do
 
   @impl true
   def start(_type, _args) do
-    kv = if Mix.target() != :host, do: Nerves.Runtime.KV.get_all(), else: %{}
+    target = Nerves.Runtime.mix_target()
+    kv = if target != :host, do: Nerves.Runtime.KV.get_all(), else: %{}
     setup_bot(kv)
     setup_wifi(kv)
     setup_database()
@@ -17,7 +18,7 @@ defmodule MountainNerves.Application do
         # Children for all targets
         # Starts a worker by calling: MountainNerves.Worker.start_link(arg)
         # {MountainNerves.Worker, arg},
-      ] ++ target_children(Nerves.Runtime.mix_target())
+      ] ++ target_children(target)
 
     # See https://hexdocs.pm/elixir/Supervisor.html
     # for other strategies and supported options

@@ -9,17 +9,33 @@ defmodule MountainNerves.Bot do
   alias MountainNerves.Trails
   alias MountainNerves.Middleware.ConversationState
 
+  # Command modules
+  alias MountainNerves.Bot.Commands.Start
+  alias MountainNerves.Bot.Commands.Help
+  alias MountainNerves.Bot.Commands.Admin
+  alias MountainNerves.Bot.Commands.Status
+  alias MountainNerves.Bot.Commands.Reboot
+  alias MountainNerves.Bot.Commands.EstimateTrail
+  alias MountainNerves.Bot.Commands.AnnualSummary
+  alias MountainNerves.Bot.Commands.InterannualSummary
+  alias MountainNerves.Bot.Commands.MonthlySummary
+  alias MountainNerves.Bot.Commands.InterannualGraph
+
   # Pagination configuration
   @items_per_page 8
 
-  command("start")
+  # Bot commands - ALL commands MUST have descriptions
+  # These descriptions are automatically sent to Telegram when the bot connects to the internet
+  # to populate the command menu in the Telegram UI
+  command("start", description: "Start the bot")
   command("help", description: "Print the bot's help")
   command("admin", description: "Admin commands (owner only)")
   command("status", description: "Show system status (admin only)")
   command("reboot", description: "Reboot the device (admin only)")
   command("estimate_trail", description: "Estimate the difficulty of a trail")
-  command("annual_summary", description: "Get the annual summary stats")
-  command("interannual_summary", description: "Get stats from the beginning of the current year")
+  command("annual_summary", description: "Get the annual summary stats (current year)")
+  command("interannual_graph", description: "Generate a graph of interannual trail scores (last 365 days)")
+  command("interannual_summary", description: "Get interannual summary stats (last 365 days)")
   command("monthly_summary", description: "Get the monthly summary stats")
 
   middleware(ExGram.Middleware.IgnoreUsername)
@@ -29,137 +45,38 @@ defmodule MountainNerves.Bot do
 
   ## Put here all the initizalization of the bot which will not require Internet
   def init(_opts) do
+    # Subscribe to VintageNet connection status for all interfaces (only on target, not host)
+    if target() != :host do
+      VintageNet.subscribe(["connection"])
+      Logger.info("Bot: Subscribed to VintageNet connection status")
+    end
+
     :ok
   end
 
-  def handle({:command, :start, msg}, context) do
-    log_command("start", msg)
-    result = answer(context, "Hi!")
-    Logger.info("Bot: Start response result: #{inspect(result)}")
-    result
-  end
+  def handle({:command, :start, msg}, context), do: Start.handle(msg, context)
 
-  def handle({:command, :help, msg}, context) do
-    log_command("help", msg)
+  def handle({:command, :help, msg}, context), do: Help.handle(msg, context)
 
-    answer(
-      context,
-      """
-      <b>Trail Evaluator Bot</b>
+  def handle({:command, :admin, msg}, context), do: Admin.handle(msg, context)
 
-      📊 <b>Trail Commands</b>
-      /estimate_trail - Estimate the difficulty of a trail
-      /annual_summary - Get annual summary stats (last 365 days)
-      /interannual_summary - Get year-to-date stats
-      /monthly_summary - Get monthly summary stats
+  def handle({:command, :status, msg}, context), do: Status.handle(msg, context)
 
-      ⚙️ <b>Admin Commands</b>
-      /admin - View admin commands
-      /status - Show system status (admin only)
-      /reboot - Reboot the device (admin only)
-
-      /help - Show this message
-      """,
-      parse_mode: "HTML"
-    )
-  end
-
-  def handle({:command, :admin, msg}, context) do
-    log_command("admin", msg)
-
-    if is_admin?(msg) do
-      answer(
-        context,
-        """
-        <b>Admin Commands</b>
-
-        /status - Show system status
-        /reboot - Reboot the device
-
-        You are authorized as the bot owner.
-        """,
-        parse_mode: "HTML"
-      )
-    else
-      answer(context, "⛔ Access denied. This command is for the bot owner only.")
-    end
-  end
-
-  def handle({:command, :status, msg}, context) do
-    log_command("status", msg)
-
-    if is_admin?(msg) do
-      status_info = get_system_status()
-      answer(context, status_info, parse_mode: "HTML")
-    else
-      answer(context, "⛔ Access denied. This command is for the bot owner only.")
-    end
-  end
-
-  def handle({:command, :reboot, msg}, context) do
-    log_command("reboot", msg)
-
-    if is_admin?(msg) do
-      answer(context, "🔄 Rebooting device in 3 seconds...")
-
-      # Schedule reboot (only works on actual Nerves devices)
-      if Nerves.Runtime.mix_target() != :host do
-        Task.start(fn ->
-          Process.sleep(3000)
-          :os.cmd(~c"reboot")
-        end)
-      else
-        answer(context, "⚠️ Reboot command not available on host target")
-      end
-    else
-      answer(context, "⛔ Access denied. This command is for the bot owner only.")
-    end
-  end
+  def handle({:command, :reboot, msg}, context), do: Reboot.handle(msg, context)
 
   # Trail estimation conversation flow
-  def handle({:command, :estimate_trail, msg}, context) do
-    log_command("estimate_trail", msg)
+  def handle({:command, :estimate_trail, msg}, context), do: EstimateTrail.handle(msg, context)
 
-    new_context = %{context | extra: %{step: :input_name, trail: %{}}}
-    save_state(msg, new_context.extra)
-    answer(new_context, "🏔️ Introduce el nombre de la ruta")
-  end
+  def handle({:command, :annual_summary, msg}, context), do: AnnualSummary.handle(msg, context)
 
-  def handle({:command, :annual_summary, msg}, context) do
-    log_command("annual_summary", msg)
+  def handle({:command, :interannual_graph, msg}, context),
+    do: InterannualGraph.handle(msg, context)
 
-    case Trails.annual_summary() do
-      {overall_stats, summary} ->
-        send_paginated_summary(context, "annual", "Annual", overall_stats, summary, 0)
+  def handle({:command, :interannual_summary, msg}, context),
+    do: InterannualSummary.handle(msg, context)
 
-      _error ->
-        answer(context, "Error retrieving annual summary")
-    end
-  end
-
-  def handle({:command, :interannual_summary, msg}, context) do
-    log_command("interannual_summary", msg)
-
-    case Trails.interannual_summary() do
-      {overall_stats, summary} ->
-        send_paginated_summary(context, "interannual", "Year-to-Date", overall_stats, summary, 0)
-
-      _error ->
-        answer(context, "Error retrieving interannual summary")
-    end
-  end
-
-  def handle({:command, :monthly_summary, msg}, context) do
-    log_command("monthly_summary", msg)
-
-    case Trails.monthly_summary() do
-      {overall_stats, summary} ->
-        send_paginated_summary(context, "monthly", "Monthly", overall_stats, summary, 0)
-
-      _error ->
-        answer(context, "Error retrieving monthly summary")
-    end
-  end
+  def handle({:command, :monthly_summary, msg}, context),
+    do: MonthlySummary.handle(msg, context)
 
   # Handle pagination callbacks
   def handle({:callback_query, %{data: "summary:" <> data} = query}, _context) do
@@ -173,8 +90,8 @@ defmodule MountainNerves.Bot do
     end
 
     period_name = case summary_type do
-      "annual" -> "Annual"
-      "interannual" -> "Year-to-Date"
+      "annual" -> "Annual (Current Year)"
+      "interannual" -> "Interannual (Last 365 Days)"
       "monthly" -> "Monthly"
     end
 
@@ -182,9 +99,17 @@ defmodule MountainNerves.Bot do
     edit_paginated_summary(query, summary_type, period_name, overall_stats, summary, page)
   end
 
-  def handle({:info, :init}, _cnt) do
-    Logger.info("Init with Internet")
+  # Handle VintageNet connection status changes
+  def handle({:info, {VintageNet, ["connection"], _old_value, :internet, _meta}}, _cnt) do
+    Logger.info("Bot: Internet connection established")
 
+    # Wait 5 second for network to stabilize
+    Process.sleep(5000)
+
+    # Set bot commands
+    set_bot_commands()
+
+    # Send IP address to admin
     user = Application.get_env(:mountain_nerves, :tg_owner_user)
 
     if user do
@@ -194,106 +119,15 @@ defmodule MountainNerves.Bot do
     :ok
   end
 
-  # Trail conversation flow - input name
-  def handle({:text, text, tg_model}, %{extra: %{step: :input_name, trail: trail}} = context) do
-    trail = Map.put(trail, :name, text)
-    new_context = %{context | extra: %{step: :input_height, trail: trail}}
-    save_state(tg_model, new_context.extra)
-    answer(new_context, "📏 Introduce el desnivel de la ruta en metros")
+  # Handle other VintageNet events (ignore)
+  def handle({:info, {VintageNet, _property, _old, _new, _meta}}, _cnt) do
+    :ok
   end
 
-  # Trail conversation flow - input height
-  def handle({:text, text, tg_model}, %{extra: %{step: :input_height, trail: trail}} = context) do
-    case parse_float(text) do
-      {:ok, height} ->
-        trail = Map.put(trail, :height, height)
-        new_context = %{context | extra: %{step: :input_distance, trail: trail}}
-        save_state(tg_model, new_context.extra)
-        answer(new_context, "📍 Introduce la distancia de la ruta en kilómetros")
-
-      :error ->
-        answer(context, "❌ No me has dado un número válido. Introduce el desnivel en metros:")
-    end
-  end
-
-  # Trail conversation flow - input distance
-  def handle({:text, text, tg_model}, %{extra: %{step: :input_distance, trail: trail}} = context) do
-    case parse_float(text) do
-      {:ok, distance} ->
-        trail = Map.put(trail, :distance, distance)
-        new_context = %{context | extra: %{step: :input_velocity, trail: trail}}
-        save_state(tg_model, new_context.extra)
-        answer(new_context, "🚀 Introduce la velocidad de la ruta en km/h")
-
-      :error ->
-        answer(
-          context,
-          "❌ No me has dado un número válido. Introduce la distancia en kilómetros:"
-        )
-    end
-  end
-
-  # Trail conversation flow - input velocity
-  def handle({:text, text, tg_model}, %{extra: %{step: :input_velocity, trail: trail}} = context) do
-    case parse_float(text) do
-      {:ok, velocity} ->
-        trail = Map.put(trail, :velocity, velocity)
-        new_context = %{context | extra: %{step: :input_weather, trail: trail}}
-        save_state(tg_model, new_context.extra)
-        answer(new_context, "🌦️ ¿Ha habido meteorología extrema? S/N")
-
-      :error ->
-        answer(context, "❌ No me has dado un número válido. Introduce la velocidad en km/h:")
-    end
-  end
-
-  # Trail conversation flow - input weather (final step)
-  def handle({:text, text, tg_model}, %{extra: %{step: :input_weather, trail: trail}} = context) do
-    extreme_temp = String.upcase(text) in ["S", "SI", "Y", "YES"]
-
-    score =
-      Trails.compute_score(
-        trail.height,
-        trail.distance,
-        trail.velocity,
-        extreme_temp
-      )
-
-    # Save to database
-    trail_attrs = %{
-      name: trail.name,
-      height: trail.height,
-      distance: trail.distance,
-      velocity: trail.velocity,
-      extreme_temp: extreme_temp,
-      score: score
-    }
-
-    case Trails.create_trail(trail_attrs) do
-      {:ok, _saved_trail} ->
-        classification = Trails.score_classification(score)
-
-        # Clear conversation state - conversation is complete
-        clear_state(tg_model)
-
-        answer(
-          context,
-          """
-          ✅ Ruta guardada!
-
-          🎯 La puntuación de la ruta es de #{Float.round(score, 2)} sobre 100
-
-          🏆 La ruta se clasifica como: <b>#{classification}</b>
-          """,
-          parse_mode: "HTML"
-        )
-
-      {:error, _changeset} ->
-        # Clear conversation state
-        clear_state(tg_model)
-
-        answer(context, "❌ Error al guardar la ruta. Por favor, inténtalo de nuevo.")
-    end
+  # Trail conversation flow - delegate to EstimateTrail module
+  def handle({:text, _text, _tg_model} = msg, %{extra: %{step: step}} = context)
+      when step in [:input_name, :input_height, :input_distance, :input_velocity, :input_weather] do
+    EstimateTrail.handle_text(msg, context)
   end
 
   # Default text handler - no active conversation
@@ -311,7 +145,7 @@ defmodule MountainNerves.Bot do
   end
 
   # Send paginated summary with navigation buttons
-  defp send_paginated_summary(context, summary_type, period_name, overall_stats, summary, page) do
+  def send_paginated_summary(context, summary_type, period_name, overall_stats, summary, page) do
     message = format_summary_page(period_name, overall_stats, summary, page)
     keyboard = build_pagination_keyboard(summary_type, summary, page)
 
@@ -406,7 +240,7 @@ defmodule MountainNerves.Bot do
   end
 
   # Helper function to check if user is admin
-  defp is_admin?(%{from: %{id: user_id}}) do
+  def is_admin?(%{from: %{id: user_id}}) do
     owner_user = Application.get_env(:mountain_nerves, :tg_owner_user)
 
     cond do
@@ -426,10 +260,10 @@ defmodule MountainNerves.Bot do
     end
   end
 
-  defp is_admin?(_msg), do: false
+  def is_admin?(_msg), do: false
 
   # Get system status information
-  defp get_system_status do
+  def get_system_status do
     target = Nerves.Runtime.mix_target()
     uptime = get_uptime()
     memory = get_memory_info()
@@ -489,7 +323,7 @@ defmodule MountainNerves.Bot do
   end
 
   # Helper function to log user commands
-  defp log_command(command, msg) do
+  def log_command(command, msg) do
     user = get_user_info(msg)
     Logger.info("Bot: User #{user} requested /#{command}")
   end
@@ -512,16 +346,6 @@ defmodule MountainNerves.Bot do
   end
 
   # Parse float from string, handling both comma and dot as decimal separator
-  defp parse_float(text) do
-    cleaned = String.replace(text, ",", ".")
-
-    case Float.parse(cleaned) do
-      {number, ""} -> {:ok, number}
-      {number, _rest} -> {:ok, number}
-      :error -> :error
-    end
-  end
-
   defp format_number(nil), do: "0.00"
   defp format_number(num) when is_float(num), do: Float.round(num, 2) |> Float.to_string()
   defp format_number(num) when is_integer(num), do: format_integer_with_separators(num)
@@ -547,6 +371,31 @@ defmodule MountainNerves.Bot do
     |> Enum.chunk_every(3)
     |> Enum.join(" ")
     |> String.reverse()
+  end
+
+  # Set bot commands in Telegram using the command macros
+  defp set_bot_commands do
+    # Convert command macros to BotCommand structs (only those with descriptions)
+    send_commands =
+      for command <- commands(), command[:description] != nil do
+        %ExGram.Model.BotCommand{
+          command: to_string(command[:command]),
+          description: command[:description]
+        }
+      end
+
+    case ExGram.set_my_commands(send_commands) do
+      {:ok, _} ->
+        Logger.info("Bot: Commands set successfully (#{length(send_commands)} commands)")
+
+      {:error, reason} ->
+        Logger.error("Bot: Failed to set commands: #{inspect(reason)}")
+    end
+  end
+
+  # Get the target at runtime
+  defp target do
+    Nerves.Runtime.mix_target()
   end
 
   # Send IP address with retry logic (spawns async task)
@@ -695,14 +544,14 @@ defmodule MountainNerves.Bot do
   end
 
   # Helper functions for conversation state management
-  defp save_state(msg, extra) do
+  def save_state(msg, extra) do
     case extract_chat_id(msg) do
       nil -> :ok
       chat_id -> ConversationState.save_state(chat_id, extra)
     end
   end
 
-  defp clear_state(msg) do
+  def clear_state(msg) do
     case extract_chat_id(msg) do
       nil -> :ok
       chat_id -> ConversationState.clear_state(chat_id)

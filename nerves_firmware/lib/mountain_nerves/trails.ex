@@ -93,21 +93,21 @@ defmodule MountainNerves.Trails do
   end
 
   @doc """
-  Returns annual summary statistics (last 365 days).
+  Returns annual summary statistics (from beginning of current year).
   Returns {overall_stats, summary_by_name}
   """
   def annual_summary do
-    one_year_ago = DateTime.utc_now() |> DateTime.add(-365, :day)
-    n_time_summary(one_year_ago)
+    beginning_of_year = get_beginning_of_year()
+    n_time_summary(beginning_of_year)
   end
 
   @doc """
-  Returns interannual summary statistics (from beginning of current year).
+  Returns interannual summary statistics (last 365 days).
   Returns {overall_stats, summary_by_name}
   """
   def interannual_summary do
-    beginning_of_year = get_beginning_of_year()
-    n_time_summary(beginning_of_year)
+    one_year_ago = DateTime.utc_now() |> DateTime.add(-365, :day)
+    n_time_summary(one_year_ago)
   end
 
   @doc """

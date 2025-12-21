@@ -103,6 +103,8 @@ defmodule MountainNerves.MixProject do
       # {:ex_gram, "~> 0.56"},
       {:tesla, "~> 1.2"},
       {:req, "~> 0.5.0"},
+      {:contex, "~> 0.5.0"},
+      {:resvg, "~> 0.5.0"},
       {:tidewave, "~> 0.5", only: :dev, targets: :host},
       {:dotenvy, "~> 0.8", only: [:dev, :test], targets: :host}
     ]

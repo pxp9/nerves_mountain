@@ -83,8 +83,6 @@ if Mix.target() != :host do
       case new_value do
         :internet ->
           Logger.info("WiFi: Internet connection established")
-          Process.sleep(200)
-          send(:mountain_nerves, :init)
           {:noreply, %{state | connection_status: :internet}}
 
         :lan ->
