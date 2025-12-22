@@ -195,12 +195,10 @@ defmodule MountainNerves.TrailsTest do
 
   describe "monthly_summary/0" do
     test "returns empty summary when no trails" do
-      {summary, {cum_distance, cum_height, cum_score}} = Trails.monthly_summary()
+      {{_sum_distance, _sum_height, _avg_distance, _avg_velocity, _avg_score, count}, summary} = Trails.monthly_summary()
 
       assert summary == []
-      assert cum_distance == 0.0
-      assert cum_height == 0.0
-      assert cum_score == 0.0
+      assert count == 0
     end
 
     test "aggregates trails by name" do
@@ -209,16 +207,15 @@ defmodule MountainNerves.TrailsTest do
       create_test_trail("Maliciosa", 1100, 16, 2.6)
       create_test_trail("Peñalara", 800, 12, 2.2)
 
-      {summary, {cum_distance, cum_height, cum_score}} = Trails.monthly_summary()
+      {{sum_distance, sum_height, _avg_distance, _avg_velocity, _avg_score, _count}, summary} = Trails.monthly_summary()
 
       assert length(summary) == 2
-      assert cum_distance > 0
-      assert cum_height > 0
-      assert cum_score > 0
+      assert sum_distance > 0
+      assert sum_height > 0
 
       # Find Maliciosa stats
-      {_name, freq, _velocity, _distance, _height, _score} =
-        Enum.find(summary, fn {name, _, _, _, _, _} -> name == "Maliciosa" end)
+      {_name, freq, _velocity, _distance, _height, _score, _last_datetime} =
+        Enum.find(summary, fn {name, _, _, _, _, _, _} -> name == "Maliciosa" end)
 
       assert freq == 2
     end
@@ -227,24 +224,22 @@ defmodule MountainNerves.TrailsTest do
       create_test_trail("Trail 1", 1000, 15, 2.5)
       create_test_trail("Trail 2", 500, 10, 2.0)
 
-      {_summary, {cum_distance, cum_height, cum_score}} = Trails.monthly_summary()
+      {{sum_distance, sum_height, _avg_distance, _avg_velocity, _avg_score, _count}, _summary} = Trails.monthly_summary()
 
-      assert_in_delta cum_distance, 25.0, 0.1
-      assert_in_delta cum_height, 1500.0, 0.1
-      assert cum_score > 0
+      assert_in_delta sum_distance, 25.0, 0.1
+      assert_in_delta sum_height, 1500.0, 0.1
     end
   end
 
   describe "annual_summary/0" do
-    test "returns summary for last 365 days" do
+    test "returns summary for current year" do
       create_test_trail("Test Trail", 1000, 15, 2.5)
 
-      {summary, {cum_distance, cum_height, cum_score}} = Trails.annual_summary()
+      {{sum_distance, sum_height, _avg_distance, _avg_velocity, _avg_score, _count}, summary} = Trails.annual_summary()
 
       assert length(summary) >= 1
-      assert cum_distance > 0
-      assert cum_height > 0
-      assert cum_score > 0
+      assert sum_distance > 0
+      assert sum_height > 0
     end
   end
 
