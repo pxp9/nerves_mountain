@@ -45,7 +45,6 @@ if mix_target == :host do
 end
 
 config :logger, level: :info
-config :ex_gram, Tesla.Middleware.Logger, level: :info
 
 config :mountain_nerves, InterfaceWeb.Endpoint,
   adapter: Bandit.PhoenixAdapter,

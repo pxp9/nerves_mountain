@@ -40,8 +40,5 @@ else
     show_sensitive_data_on_connection_error: true
 end
 
-# Configure Tesla adapter (same as target)
-config :tesla, :adapter, {Tesla.Adapter.Finch, name: Req.Finch}
-
 # Configure ExGram adapter
-config :ex_gram, adapter: ExGram.Adapter.Tesla, json_engine: Jason, delete_webhook: true
+config :ex_gram, adapter: ExGram.Adapter.Req, json_engine: Jason, delete_webhook: true
