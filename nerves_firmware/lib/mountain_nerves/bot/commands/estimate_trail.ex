@@ -62,7 +62,17 @@ defmodule MountainNerves.Bot.Commands.EstimateTrail do
         trail = Map.put(trail, :velocity, velocity)
         new_context = %{context | extra: %{step: :input_weather, trail: trail}}
         MountainNerves.Bot.save_state(tg_model, new_context.extra)
-        answer(new_context, "🌦️ ¿Ha habido meteorología extrema? S/N")
+
+        answer(
+          new_context,
+          """
+          🌦️ Selecciona el tipo de meteorología:
+
+          1️⃣ Normal
+          2️⃣ Extrema
+          3️⃣ Nieve
+          """
+        )
 
       :error ->
         answer(context, "❌ No me has dado un número válido. Introduce la velocidad en km/h:")
@@ -71,50 +81,65 @@ defmodule MountainNerves.Bot.Commands.EstimateTrail do
 
   # Trail conversation flow - input weather (final step)
   def handle_text({:text, text, tg_model}, %{extra: %{step: :input_weather, trail: trail}} = context) do
-    extreme_temp = String.upcase(text) in ["S", "SI", "Y", "YES"]
+    case parse_weather_condition(text) do
+      {:ok, weather_condition} ->
+        score =
+          Trails.compute_score(
+            trail.height,
+            trail.distance,
+            trail.velocity,
+            weather_condition
+          )
 
-    score =
-      Trails.compute_score(
-        trail.height,
-        trail.distance,
-        trail.velocity,
-        extreme_temp
-      )
+        # Save to database
+        trail_attrs = %{
+          name: trail.name,
+          height: trail.height,
+          distance: trail.distance,
+          velocity: trail.velocity,
+          weather_condition: weather_condition,
+          score: score
+        }
 
-    # Save to database
-    trail_attrs = %{
-      name: trail.name,
-      height: trail.height,
-      distance: trail.distance,
-      velocity: trail.velocity,
-      extreme_temp: extreme_temp,
-      score: score
-    }
+        case Trails.create_trail(trail_attrs) do
+          {:ok, _saved_trail} ->
+            classification = Trails.score_classification(score)
+            weather_label = weather_label(weather_condition)
 
-    case Trails.create_trail(trail_attrs) do
-      {:ok, _saved_trail} ->
-        classification = Trails.score_classification(score)
+            # Clear conversation state - conversation is complete
+            MountainNerves.Bot.clear_state(tg_model)
 
-        # Clear conversation state - conversation is complete
-        MountainNerves.Bot.clear_state(tg_model)
+            answer(
+              context,
+              """
+              ✅ Ruta guardada!
 
+              🌦️ Meteorología: #{weather_label}
+              🎯 La puntuación de la ruta es de #{Float.round(score, 2)} sobre 100
+
+              🏆 La ruta se clasifica como: <b>#{classification}</b>
+              """,
+              parse_mode: "HTML"
+            )
+
+          {:error, _changeset} ->
+            # Clear conversation state
+            MountainNerves.Bot.clear_state(tg_model)
+
+            answer(context, "❌ Error al guardar la ruta. Por favor, inténtalo de nuevo.")
+        end
+
+      :error ->
         answer(
           context,
           """
-          ✅ Ruta guardada!
+          ❌ Opción no válida. Por favor selecciona:
 
-          🎯 La puntuación de la ruta es de #{Float.round(score, 2)} sobre 100
-
-          🏆 La ruta se clasifica como: <b>#{classification}</b>
-          """,
-          parse_mode: "HTML"
+          1️⃣ Normal
+          2️⃣ Extrema
+          3️⃣ Nieve
+          """
         )
-
-      {:error, _changeset} ->
-        # Clear conversation state
-        MountainNerves.Bot.clear_state(tg_model)
-
-        answer(context, "❌ Error al guardar la ruta. Por favor, inténtalo de nuevo.")
     end
   end
 
@@ -129,4 +154,19 @@ defmodule MountainNerves.Bot.Commands.EstimateTrail do
       :error -> :error
     end
   end
+
+  # Parse weather condition from user input (expects 1, 2, or 3)
+  defp parse_weather_condition(text) do
+    case String.trim(text) do
+      "1" -> {:ok, :normal}
+      "2" -> {:ok, :extreme}
+      "3" -> {:ok, :snow}
+      _ -> :error
+    end
+  end
+
+  # Get weather condition label in Spanish
+  defp weather_label(:normal), do: "Normal"
+  defp weather_label(:extreme), do: "Extrema"
+  defp weather_label(:snow), do: "Nieve"
 end

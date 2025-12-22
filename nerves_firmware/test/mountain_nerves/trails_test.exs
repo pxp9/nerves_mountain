@@ -12,8 +12,8 @@ defmodule MountainNerves.TrailsTest do
   end
 
   describe "compute_score/4" do
-    test "calculates score without extreme weather" do
-      score = Trails.compute_score(1000, 15, 2.5)
+    test "calculates score with normal weather" do
+      score = Trails.compute_score(1000, 15, 2.5, :normal)
       # Expected: (1000/1500 * 0.5 + 15/23 * 0.3 + 2.5/3.2 * 0.2) * 100
       # = (0.6667 * 0.5 + 0.6522 * 0.3 + 0.7813 * 0.2) * 100
       # = (0.3333 + 0.1957 + 0.1563) * 100 = 68.53
@@ -21,10 +21,17 @@ defmodule MountainNerves.TrailsTest do
     end
 
     test "calculates score with extreme weather multiplier" do
-      score_normal = Trails.compute_score(1000, 15, 2.5, false)
-      score_extreme = Trails.compute_score(1000, 15, 2.5, true)
+      score_normal = Trails.compute_score(1000, 15, 2.5, :normal)
+      score_extreme = Trails.compute_score(1000, 15, 2.5, :extreme)
 
       assert_in_delta score_extreme, score_normal * 1.15, 0.1
+    end
+
+    test "calculates score with snow weather multiplier" do
+      score_normal = Trails.compute_score(1000, 15, 2.5, :normal)
+      score_snow = Trails.compute_score(1000, 15, 2.5, :snow)
+
+      assert_in_delta score_snow, score_normal * 1.10, 0.1
     end
 
     test "handles edge case with zero values" do
@@ -82,13 +89,13 @@ defmodule MountainNerves.TrailsTest do
   end
 
   describe "create_trail/1" do
-    test "creates a valid trail" do
+    test "creates a valid trail with normal weather" do
       attrs = %{
         name: "Test Trail",
         height: 1000.0,
         distance: 15.0,
         velocity: 2.5,
-        extreme_temp: false,
+        weather_condition: :normal,
         score: 68.5
       }
 
@@ -97,7 +104,7 @@ defmodule MountainNerves.TrailsTest do
       assert trail.height == 1000.0
       assert trail.distance == 15.0
       assert trail.velocity == 2.5
-      assert trail.extreme_temp == false
+      assert trail.weather_condition == :normal
       assert trail.score == 68.5
       assert trail.id != nil
     end
@@ -133,12 +140,26 @@ defmodule MountainNerves.TrailsTest do
         height: 1200.0,
         distance: 18.0,
         velocity: 2.8,
-        extreme_temp: true,
+        weather_condition: :extreme,
         score: 85.0
       }
 
       assert {:ok, %Trail{} = trail} = Trails.create_trail(attrs)
-      assert trail.extreme_temp == true
+      assert trail.weather_condition == :extreme
+    end
+
+    test "creates trail with snow weather" do
+      attrs = %{
+        name: "Snow Trail",
+        height: 1100.0,
+        distance: 16.0,
+        velocity: 2.6,
+        weather_condition: :snow,
+        score: 75.0
+      }
+
+      assert {:ok, %Trail{} = trail} = Trails.create_trail(attrs)
+      assert trail.weather_condition == :snow
     end
   end
 
@@ -228,15 +249,15 @@ defmodule MountainNerves.TrailsTest do
   end
 
   # Helper functions
-  defp create_test_trail(name, height, distance, velocity, extreme_temp \\ false) do
-    score = Trails.compute_score(height, distance, velocity, extreme_temp)
+  defp create_test_trail(name, height, distance, velocity, weather_condition \\ :normal) do
+    score = Trails.compute_score(height, distance, velocity, weather_condition)
 
     Trails.create_trail(%{
       name: name,
       height: height * 1.0,
       distance: distance * 1.0,
       velocity: velocity,
-      extreme_temp: extreme_temp,
+      weather_condition: weather_condition,
       score: score
     })
   end

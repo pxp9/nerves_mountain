@@ -20,19 +20,23 @@ defmodule MountainNerves.Trails do
   @max_distance 23
   @max_velocity 3.2
   @extreme_weather_multiplier 1.15
+  @snow_weather_multiplier 1.10
 
   @doc """
-  Computes the trail difficulty score based on height, distance, velocity, and weather.
+  Computes the trail difficulty score based on height, distance, velocity, and weather condition.
 
   Score formula:
   - Height contributes 50% (normalized to MAX_HEIGHT = 1500m)
   - Distance contributes 30% (normalized to MAX_DISTANCE = 23km)
   - Velocity contributes 20% (normalized to MAX_VELOCITY = 3.2 km/h)
-  - Extreme weather multiplies final score by 1.15
+  - Weather conditions:
+    - :normal - no multiplier
+    - :extreme - multiplies final score by 1.15
+    - :snow - multiplies final score by 1.10
 
   Returns a score from 0-100+
   """
-  def compute_score(height, distance, velocity, extreme_temp \\ false) do
+  def compute_score(height, distance, velocity, weather_condition \\ :normal) do
     score =
       height / @max_height * 0.5 +
         distance / @max_distance * 0.3 +
@@ -40,10 +44,11 @@ defmodule MountainNerves.Trails do
 
     score = score * 100
 
-    if extreme_temp do
-      score * @extreme_weather_multiplier
-    else
-      score
+    case weather_condition do
+      :extreme -> score * @extreme_weather_multiplier
+      :snow -> score * @snow_weather_multiplier
+      :normal -> score
+      _ -> score
     end
   end
 
