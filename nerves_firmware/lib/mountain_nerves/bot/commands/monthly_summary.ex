@@ -10,7 +10,9 @@ defmodule MountainNerves.Bot.Commands.MonthlySummary do
   def handle(msg, context) do
     MountainNerves.Bot.log_command("monthly_summary", msg)
 
-    case Trails.monthly_summary() do
+    user_id = MountainNerves.Bot.get_or_create_user(msg.from)
+
+    case Trails.monthly_summary(user_id) do
       {overall_stats, summary} ->
         MountainNerves.Bot.send_paginated_summary(
           context,

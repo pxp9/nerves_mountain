@@ -91,6 +91,9 @@ defmodule MountainNerves.Bot.Commands.EstimateTrail do
             weather_condition
           )
 
+        # Get or create user and get their telegram_id
+        user_id = MountainNerves.Bot.get_or_create_user(tg_model.from)
+
         # Save to database
         trail_attrs = %{
           name: trail.name,
@@ -98,7 +101,8 @@ defmodule MountainNerves.Bot.Commands.EstimateTrail do
           distance: trail.distance,
           velocity: trail.velocity,
           weather_condition: weather_condition,
-          score: score
+          score: score,
+          user_id: user_id
         }
 
         case Trails.create_trail(trail_attrs) do

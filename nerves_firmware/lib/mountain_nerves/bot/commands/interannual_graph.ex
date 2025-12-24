@@ -12,10 +12,12 @@ defmodule MountainNerves.Bot.Commands.InterannualGraph do
   def handle(msg, context) do
     MountainNerves.Bot.log_command("interannual_graph", msg)
 
+    user_id = MountainNerves.Bot.get_or_create_user(msg.from)
+
     # Send "generating..." message
     ExGram.send_message(msg.chat.id, "📊 Generating interannual graph, please wait...")
 
-    case GraphGenerator.generate_interannual_graph() do
+    case GraphGenerator.generate_interannual_graph(user_id) do
       {:ok, file_path} ->
         # Send the PNG file as a photo
         chat_id = msg.chat.id

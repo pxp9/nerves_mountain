@@ -9,6 +9,9 @@ Repo.delete_all(Trail)
 
 IO.puts("Seeding trails...")
 
+# Default user for seed data (Pepe)
+default_user_id = 1350890521
+
 # Helper function to create a trail with a specific date
 create_trail_with_date = fn name, height, distance, velocity, weather_condition, days_ago ->
   inserted_at =
@@ -31,6 +34,7 @@ create_trail_with_date = fn name, height, distance, velocity, weather_condition,
     velocity: velocity,
     weather_condition: weather_condition,
     score: score,
+    user_id: default_user_id,
     inserted_at: inserted_at,
     updated_at: inserted_at
   }
@@ -40,10 +44,10 @@ end
 # ===== CURRENT MONTH (Last 30 days) =====
 IO.puts("Creating trails for current month...")
 
-# Easy trail - TURISTA DE MIERDA (< 35)
-create_trail_with_date.("Paseo del Parque", 100.0, 3.0, 1.5, :normal, 5)
-create_trail_with_date.("Paseo del Parque", 120.0, 3.2, 1.6, :normal, 15)
-create_trail_with_date.("Paseo del Parque", 80.0, 2.8, 1.4, :normal, 25)
+# Easy trail - TURISTA DE MIERDA (< 35) - Each trail on different days
+create_trail_with_date.("Paseo del Parque", 100.0, 3.0, 1.5, :normal, 1)
+create_trail_with_date.("Paseo del Parque", 120.0, 3.2, 1.6, :normal, 5)
+create_trail_with_date.("Paseo del Parque", 80.0, 2.8, 1.4, :normal, 10)
 
 # Medium-low - CHICHINABO INFERIOR (35-45)
 create_trail_with_date.("Ruta Verde", 400.0, 8.0, 2.0, :normal, 3)
@@ -54,7 +58,7 @@ create_trail_with_date.("Sendero Azul", 500.0, 10.0, 2.3, :normal, 7)
 create_trail_with_date.("Sendero Azul", 520.0, 10.2, 2.4, :normal, 18)
 
 # Medium-high - APAÑÁ (50-60)
-create_trail_with_date.("Montaña Roja", 700.0, 12.0, 2.5, :normal, 10)
+create_trail_with_date.("Montaña Roja", 700.0, 12.0, 2.5, :normal, 11)
 
 # Hard - RUTÓN (60-80)
 create_trail_with_date.("Pico del Águila", 1000.0, 15.0, 2.8, :normal, 2)
@@ -89,7 +93,7 @@ create_trail_with_date.("Aneto", 1380.0, 21.5, 3.0, :normal, 480)
 # ===== TRAILS WITH EXTREME WEATHER =====
 IO.puts("Creating trails with extreme weather...")
 
-# Same trail, but with extreme weather (multiplier 1.15)
+# Same trail, but with extreme weather (multiplier 1.15) - different days
 create_trail_with_date.("Aneto", 1450.0, 22.5, 3.2, :extreme, 4)
 create_trail_with_date.("Pico del Águila", 1100.0, 16.0, 3.0, :extreme, 6)
 create_trail_with_date.("Montaña Roja", 750.0, 13.0, 2.7, :extreme, 14)
@@ -98,12 +102,12 @@ create_trail_with_date.("Montaña Roja", 750.0, 13.0, 2.7, :extreme, 14)
 IO.puts("Creating edge case trails...")
 
 # Maximum values trail (should exceed 100 score)
-create_trail_with_date.("Everest Simulator", 1500.0, 23.0, 3.2, :extreme, 1)
+create_trail_with_date.("Everest Simulator", 1500.0, 23.0, 3.2, :extreme, 15)
 
 # Minimum values trail
-create_trail_with_date.("Micro Paseo", 10.0, 0.5, 0.8, :normal, 11)
+create_trail_with_date.("Micro Paseo", 10.0, 0.5, 0.8, :normal, 17)
 
-# Exactly at boundaries
+# Exactly at boundaries - all on different days
 create_trail_with_date.("Camino de Santiago", 300.0, 6.0, 1.8, :normal, 16)
 create_trail_with_date.("Picos de Europa", 550.0, 10.5, 2.3, :normal, 21)
 create_trail_with_date.("Sierra de Gredos", 800.0, 13.0, 2.6, :normal, 26)
@@ -112,7 +116,7 @@ create_trail_with_date.("Mulhacén", 1100.0, 17.0, 2.9, :normal, 28)
 # ===== TRAILS WITH SNOW WEATHER =====
 IO.puts("Creating trails with snow weather...")
 
-# Same trail, but with snow weather (multiplier 1.10)
+# Same trail, but with snow weather (multiplier 1.10) - different days
 create_trail_with_date.("Mulhacén", 1150.0, 17.5, 3.0, :snow, 9)
 create_trail_with_date.("Sierra de Gredos", 850.0, 13.5, 2.7, :snow, 13)
 create_trail_with_date.("Picos de Europa", 600.0, 11.0, 2.4, :snow, 19)

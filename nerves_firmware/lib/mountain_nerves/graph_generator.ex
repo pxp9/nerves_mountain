@@ -20,14 +20,14 @@ defmodule MountainNerves.GraphGenerator do
 
   ## Examples
 
-      iex> GraphGenerator.generate_interannual_graph()
+      iex> GraphGenerator.generate_interannual_graph(905316511)
       {:ok, "/tmp/interannual_graph_123456.png"}
   """
-  def generate_interannual_graph do
+  def generate_interannual_graph(user_id) do
     # Get trails from the last 365 days
     from_date = DateTime.utc_now() |> DateTime.add(-365, :day)
 
-    trails = Trails.get_trails_from_date(from_date)
+    trails = Trails.get_trails_from_date(user_id, from_date)
 
     case trails do
       [] ->

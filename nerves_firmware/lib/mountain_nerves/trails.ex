@@ -76,10 +76,12 @@ defmodule MountainNerves.Trails do
   end
 
   @doc """
-  Returns the list of all trails.
+  Returns the list of all trails for a specific user.
   """
-  def list_trails do
-    Repo.all(Trail)
+  def list_trails(user_id) do
+    Trail
+    |> where([t], t.user_id == ^user_id)
+    |> Repo.all()
   end
 
   @doc """
@@ -88,40 +90,41 @@ defmodule MountainNerves.Trails do
   def get_trail!(id), do: Repo.get!(Trail, id)
 
   @doc """
-  Gets trails from a specific date onwards.
+  Gets trails from a specific date onwards for a specific user.
   """
-  def get_trails_from_date(from_date) do
+  def get_trails_from_date(user_id, from_date) do
     Trail
+    |> where([t], t.user_id == ^user_id)
     |> where([t], t.inserted_at >= ^from_date)
     |> order_by([t], desc: t.inserted_at)
     |> Repo.all()
   end
 
   @doc """
-  Returns annual summary statistics (from beginning of current year).
+  Returns annual summary statistics (from beginning of current year) for a specific user.
   Returns {overall_stats, summary_by_name}
   """
-  def annual_summary do
+  def annual_summary(user_id) do
     beginning_of_year = get_beginning_of_year()
-    n_time_summary(beginning_of_year)
+    n_time_summary(user_id, beginning_of_year)
   end
 
   @doc """
-  Returns interannual summary statistics (last 365 days).
+  Returns interannual summary statistics (last 365 days) for a specific user.
   Returns {overall_stats, summary_by_name}
   """
-  def interannual_summary do
+  def interannual_summary(user_id) do
     one_year_ago = DateTime.utc_now() |> DateTime.add(-365, :day)
-    n_time_summary(one_year_ago)
+    n_time_summary(user_id, one_year_ago)
   end
 
   @doc """
-  Returns monthly summary statistics (last 30 days).
+  Returns monthly summary statistics (last 30 days) for a specific user.
   Returns {overall_stats, summary_by_name}
   """
-  def monthly_summary do
+  def monthly_summary(user_id) do
     month_ago = DateTime.utc_now() |> DateTime.add(-30, :day)
-    n_time_summary(month_ago)
+    n_time_summary(user_id, month_ago)
   end
 
   defp get_beginning_of_year do
@@ -134,7 +137,7 @@ defmodule MountainNerves.Trails do
   end
 
   @doc """
-  Returns summary statistics from a specific datetime.
+  Returns summary statistics from a specific datetime for a specific user.
   Returns {overall_stats, summary_by_name}
 
   overall_stats is a tuple:
@@ -143,15 +146,16 @@ defmodule MountainNerves.Trails do
   summary_by_name is a list of tuples:
   [{name, count, avg_velocity, avg_distance, avg_height, avg_score, last_datetime}, ...]
   """
-  def n_time_summary(from_datetime) do
-    summary_by_name = summary_by_name_query(from_datetime)
-    overall_stats = overall_stats_query(from_datetime)
+  def n_time_summary(user_id, from_datetime) do
+    summary_by_name = summary_by_name_query(user_id, from_datetime)
+    overall_stats = overall_stats_query(user_id, from_datetime)
 
     {overall_stats, summary_by_name}
   end
 
-  defp summary_by_name_query(from_datetime) do
+  defp summary_by_name_query(user_id, from_datetime) do
     Trail
+    |> where([t], t.user_id == ^user_id)
     |> where([t], t.inserted_at >= ^from_datetime)
     |> group_by([t], t.name)
     |> select([t], {
@@ -167,9 +171,10 @@ defmodule MountainNerves.Trails do
     |> Repo.all()
   end
 
-  defp overall_stats_query(from_datetime) do
+  defp overall_stats_query(user_id, from_datetime) do
     result =
       Trail
+      |> where([t], t.user_id == ^user_id)
       |> where([t], t.inserted_at >= ^from_datetime)
       |> select([t], {
         sum(t.distance),
@@ -188,14 +193,15 @@ defmodule MountainNerves.Trails do
   end
 
   @doc """
-  Finds the trail closest to a given datetime.
+  Finds the trail closest to a given datetime for a specific user.
   """
-  def closest_date_trail(target_datetime) do
+  def closest_date_trail(user_id, target_datetime) do
     # Convert datetime to unix timestamp for comparison
     target_timestamp = DateTime.to_unix(target_datetime)
 
     result =
       Trail
+      |> where([t], t.user_id == ^user_id)
       |> select([t], %{
         trail: t,
         time_diff: fragment("ABS(? - unixepoch(?))", ^target_timestamp, t.inserted_at)

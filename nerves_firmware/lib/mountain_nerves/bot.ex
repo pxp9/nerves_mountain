@@ -79,14 +79,16 @@ defmodule MountainNerves.Bot do
     do: MonthlySummary.handle(msg, context)
 
   # Handle pagination callbacks
-  def handle({:callback_query, %{data: "summary:" <> data} = query}, _context) do
+  def handle({:callback_query, %{data: "summary:" <> data, from: from} = query}, _context) do
     [summary_type, page_str] = String.split(data, ":")
     page = String.to_integer(page_str)
 
+    user_id = get_or_create_user(from)
+
     {overall_stats, summary} = case summary_type do
-      "annual" -> Trails.annual_summary()
-      "interannual" -> Trails.interannual_summary()
-      "monthly" -> Trails.monthly_summary()
+      "annual" -> Trails.annual_summary(user_id)
+      "interannual" -> Trails.interannual_summary(user_id)
+      "monthly" -> Trails.monthly_summary(user_id)
     end
 
     period_name = case summary_type do
@@ -326,6 +328,37 @@ defmodule MountainNerves.Bot do
   def log_command(command, msg) do
     user = get_user_info(msg)
     Logger.info("Bot: User #{user} requested /#{command}")
+  end
+
+  # Helper function to get or create a telegram user and return their telegram_id
+  def get_or_create_user(%{id: telegram_id, username: username, first_name: first_name, last_name: last_name}) do
+    MountainNerves.TelegramUsers.upsert_user(%{
+      telegram_id: telegram_id,
+      username: username,
+      first_name: first_name,
+      last_name: last_name
+    })
+
+    telegram_id
+  end
+
+  def get_or_create_user(%{id: telegram_id, username: username, first_name: first_name}) do
+    MountainNerves.TelegramUsers.upsert_user(%{
+      telegram_id: telegram_id,
+      username: username,
+      first_name: first_name
+    })
+
+    telegram_id
+  end
+
+  def get_or_create_user(%{id: telegram_id, first_name: first_name}) do
+    MountainNerves.TelegramUsers.upsert_user(%{
+      telegram_id: telegram_id,
+      first_name: first_name
+    })
+
+    telegram_id
   end
 
   defp get_user_info(%{from: %{username: username, first_name: first_name, id: id}})
