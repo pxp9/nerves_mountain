@@ -156,7 +156,7 @@ defmodule MountainNerves.Trails do
   defp summary_by_name_query(user_id, from_datetime) do
     Trail
     |> where([t], t.user_id == ^user_id)
-    |> where([t], t.inserted_at >= ^from_datetime)
+    |> where([t], t.updated_at >= ^from_datetime)
     |> group_by([t], t.name)
     |> select([t], {
       t.name,
@@ -167,7 +167,7 @@ defmodule MountainNerves.Trails do
       avg(t.score),
       max(t.inserted_at)
     })
-    |> order_by([t], desc: max(t.inserted_at))
+    |> order_by([t], desc: max(t.updated_at))
     |> Repo.all()
   end
 
@@ -175,7 +175,7 @@ defmodule MountainNerves.Trails do
     result =
       Trail
       |> where([t], t.user_id == ^user_id)
-      |> where([t], t.inserted_at >= ^from_datetime)
+      |> where([t], t.updated_at >= ^from_datetime)
       |> select([t], {
         sum(t.distance),
         sum(t.height),

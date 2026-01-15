@@ -269,10 +269,12 @@ defmodule MountainNerves.Bot do
     target = Nerves.Runtime.mix_target()
     uptime = get_uptime()
     memory = get_memory_info()
+    current_time = DateTime.utc_now() |> Calendar.strftime("%Y-%m-%d %H:%M:%S UTC")
 
     status = """
     <b>System Status</b>
 
+    <b>Current Time</b>: #{current_time}
     <b>Target</b>: #{target}
     <b>Uptime</b>: #{uptime}
     <b>Memory</b>: #{memory}

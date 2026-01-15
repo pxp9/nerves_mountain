@@ -95,6 +95,9 @@ config :mdns_lite,
 
 config :ex_gram, adapter: ExGram.Adapter.Req, json_engine: Jason, delete_webhook: true
 
+# Configure NervesTime to use only hora.fi.upm.es
+config :nerves_time, :servers, ["hora.fi.upm.es"]
+
 # Configure Ecto for target (Nerves device) environment
 # Database will be stored in /data partition which persists across reboots
 config :mountain_nerves, MountainNerves.Repo,

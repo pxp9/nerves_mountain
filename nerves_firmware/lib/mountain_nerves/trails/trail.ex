@@ -41,9 +41,9 @@ defmodule MountainNerves.Trails.Trail do
       # Get the date from the inserted_at timestamp
       date = DateTime.to_date(inserted_at)
 
-      # Create datetime range for the entire day
-      {:ok, day_start} = DateTime.new(date, ~T[00:00:00])
-      {:ok, day_end} = DateTime.new(date, ~T[23:59:59.999999])
+      # Create datetime range for the entire day in UTC
+      day_start = DateTime.new!(date, ~T[00:00:00], "Etc/UTC")
+      day_end = DateTime.new!(date, ~T[23:59:59.999999], "Etc/UTC")
 
       # Check if a trail already exists for this user on this date
       query =

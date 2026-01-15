@@ -5,6 +5,7 @@ defmodule MountainNerves.Bot.Commands.EstimateTrail do
 
   use ExGram.Bot, name: :mountain_nerves
 
+  require Logger
   alias MountainNerves.Trails
 
   # Command handler - start the conversation
@@ -126,7 +127,8 @@ defmodule MountainNerves.Bot.Commands.EstimateTrail do
               parse_mode: "HTML"
             )
 
-          {:error, _changeset} ->
+          {:error, changeset} ->
+            Logger.error("Cannot create Trail: #{inspect(changeset)}")
             # Clear conversation state
             MountainNerves.Bot.clear_state(tg_model)
 
